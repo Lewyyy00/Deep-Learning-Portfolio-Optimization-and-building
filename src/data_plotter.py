@@ -1,13 +1,15 @@
-from src.data_fetcher import *
+from data_fetcher import *
 
-def plot_stock_prices(adj_close):
+def plot_stock_prices(data,title):
+
+    data = pd.read_csv(data, index_col=0, parse_dates=True)
    
     plt.figure(figsize=(12, 6))
 
-    for column in adj_close.columns:
-        plt.plot(adj_close.index, adj_close[column], label=column)
+    for column in data.columns:
+        plt.plot(data.index, data[column], label=column)
 
-    plt.title("Ceny akcji w czasie (Adj Close)")
+    plt.title(title)
     plt.xlabel("Data")
     plt.ylabel("Cena")
     plt.legend()
@@ -16,4 +18,5 @@ def plot_stock_prices(adj_close):
     plt.show()
 
 
-tickers = ["AAPL", "MSFT", "GOOGL"]
+if __name__ == "__main__":
+    plot_stock_prices('log_returns.csv', 'Logarytmiczne Stopy Zwrotu Akcji')
