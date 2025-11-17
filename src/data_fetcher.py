@@ -75,4 +75,22 @@ class indicators:
 
         return log_ret
     
-processor = indicators().compute_log_returns()
+    def compute_mu_vector(self, use_log_returns=True):
+        
+        """
+        Zwraca wektor średnich stóp zwrotu dla każdego aktywa.
+
+        """
+        if use_log_returns:
+            if self.log_returns is None:
+                # jeżeli jeszcze nie policzono, policz teraz
+                self.compute_log_returns(save_csv=False)
+            returns = self.log_returns
+        else:
+            if self.simple_returns is None:
+                self.compute_simple_returns(save_csv=False)
+            returns = self.simple_returns
+
+        mu_vector = returns.mean()  # pandas.Series: średnia po wierszach
+        return mu_vector
+    
