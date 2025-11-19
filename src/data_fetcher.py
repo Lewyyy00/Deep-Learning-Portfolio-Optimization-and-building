@@ -75,10 +75,14 @@ class indicators:
 
         return log_ret
     
-    def compute_mu_vector(self, use_log_returns=True):
+    def compute_mean_vector(self, use_log_returns=True):
         
         """
         Zwraca wektor średnich stóp zwrotu dla każdego aktywa.
+
+        AAPL     0.000983
+        GOOGL    0.000812
+        MSFT     0.000803
 
         """
         if use_log_returns:
@@ -93,4 +97,23 @@ class indicators:
 
         mu_vector = returns.mean()  # pandas.Series: średnia po wierszach
         return mu_vector
+    
+    def compute_cov_vector(self):
+        """
+        Zwraca macierz kowariancji stóp zwrotu dla każdego aktywa.
+
+                AAPL     GOOGL      MSFT
+        AAPL   0.000398  0.000267  0.000288
+        GOOGL  0.000267  0.000420  0.000295
+        MSFT   0.000288  0.000295  0.000370
+
+        """
+        if self.log_returns is None:
+            self.compute_log_returns(save_csv=False)
+
+        cov_matrix = self.log_returns.cov()  # pandas.DataFrame
+        return cov_matrix
+
+
+
     

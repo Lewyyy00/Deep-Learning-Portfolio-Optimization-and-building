@@ -1,138 +1,199 @@
 from data_fetcher import *
 import cvxpy as cp
 
-
-
-processor = indicators()
-log_returns = processor.compute_log_returns()
-
-mu_hat = processor.compute_mu_vector(use_log_returns=True)  # pandas.Series
-Sigma_hat = log_returns.cov()    
-
-mu = mu_hat.values          # wektor średnich (n,)
-Sigma = Sigma_hat.values    # macierz kowariancji (n, n)
-n = len(mu)
-asset_labels = list(mu_hat.index)
-
-
-def compute_efficient_frontier(mu, Sigma, num_points=50, short_selling=False):
+class MarkowitzPortfolioOptimizer:
     """
-    Oblicza punkty granicy efektywnej dla zadanego wektora średnich stóp zwrotu
-    i macierzy kowariancji.
-
-    Parametry:
-    ----------
-    mu : np.ndarray, shape (n,)
-        Wektor oczekiwanych stóp zwrotu.
-    Sigma : np.ndarray, shape (n, n)
-        Macierz kowariancji stóp zwrotu.
-    num_points : int
-        Liczba punktów na granicy efektywnej.
-    short_selling : bool
-        Czy dopuszczać krótką sprzedaż (wagi ujemne).
-
-    Zwraca:
-    -------
-    frontier_risks : list[float]
-        Lista odchyleń standardowych portfeli (σ_p).
-    frontier_returns : list[float]
-        Lista oczekiwanych stóp zwrotu portfeli (μ_p).
-    frontier_weights : list[np.ndarray]
-        Lista wektorów wag dla kolejnych portfeli na granicy.
+    Klasa do optymalizacji portfela metodą Markowitza.
     """
 
-    n = len(mu)
-    mu_min = mu.min()
-    mu_max = mu.max()
+    def __init__(self):
+        """
+        Inicjalizuje obiekt optymalizatora Markowitza, pobierając dane 
+        stóp zwrotu, kowariacje i ich statystyki z klasy indicators.
 
-    target_returns = np.linspace(mu_min, mu_max, num_points)
+        ----------
+        ExpectedValueVector : np.ndarray, shape (n,)
+            Wektor oczekiwanych stóp zwrotu.
+        covarianceMatrix : np.ndarray, shape (n, n)
+            Macierz kowariancji stóp zwrotu.
+        numberOfAssets : int
+            Liczba aktywów w portfelu.
+        asset_labels : list[str]
+            Nazwy aktywów (np. tickery).
+        """
+        processor = indicators()
+        self.log_returns = processor.compute_log_returns()
 
-    frontier_risks = []
-    frontier_returns = []
-    frontier_weights = []
+        #Wektor oczekiwanych stóp zwrotu.
+        self.expectedValueVector = processor.compute_mean_vector(use_log_returns=True)
+        self.expectedValueVectorValues = self.expectedValueVector.values
 
-    # zmienna decyzyjna: wektory wag
-    w = cp.Variable(n)
+        #Macierz kowariancji stóp zwrotu.
+        self.covarianceMatrix = processor.compute_cov_vector()
+        self.covarianceMatrixValues = processor.compute_cov_vector().values
 
-    for mu_target in target_returns:
-        constraints = [
-            cp.sum(w) == 1,
-            w @ mu == mu_target
-        ]
-        if not short_selling:
-            constraints.append(w >= 0)
+        self.numberOfAssets = len(self.expectedValueVector)
+        self.asset_labels = list(self.expectedValueVector.index)
 
-        portfolio_variance = cp.quad_form(w, Sigma)
-        problem = cp.Problem(cp.Minimize(portfolio_variance), constraints)
-        problem.solve()
+    def compute_efficient_frontier(self,num_points=50, short_selling=False):
 
-        if w.value is None:
-            # problem mógł być niewykonalny dla danego mu_target
-            continue
+        """
+        Oblicza punkty granicy efektywnej dla zadanego wektora średnich stóp zwrotu
+        i macierzy kowariancji.
 
-        w_opt = w.value
-        mu_p = float(w_opt @ mu)
-        sigma_p = float(np.sqrt(w_opt.T @ Sigma @ w_opt))
+        Parametry:
+        ----------
+        num_points : int
+            Liczba punktów na granicy efektywnej.
+        short_selling : bool
+            Czy dopuszczać krótką sprzedaż (wagi ujemne).
 
-        frontier_risks.append(sigma_p)
-        frontier_returns.append(mu_p)
-        frontier_weights.append(w_opt)
-
-    return frontier_risks, frontier_returns, frontier_weights
-
-def plot_efficient_frontier(frontier_risks, frontier_returns, mu, Sigma, asset_labels=None):
+        Zwraca:
+        -------
+        frontier_risks : list[float]
+            Lista odchyleń standardowych portfeli (σ_p).
+        frontier_returns : list[float]
+            Lista oczekiwanych stóp zwrotu portfeli (μ_p).
+        frontier_weights : list[np.ndarray]
+            Lista wektorów wag dla kolejnych portfeli na granicy.
     """
-    Rysuje granicę efektywną oraz (opcjonalnie) punkty odpowiadające pojedynczym aktywom.
 
-    mu : np.ndarray (n,)
-        Wektor średnich stóp zwrotu.
-    Sigma : np.ndarray (n, n)
-        Macierz kowariancji.
-    asset_labels : list[str] lub None
-        Nazwy aktywów (np. tickery) do opisania punktów.
-    """
+        mu_min = self.expectedValueVector.min()
+        mu_max = self.expectedValueVector.max()
 
-    plt.figure(figsize=(10, 6))
+        target_returns = np.linspace(mu_min, mu_max, num_points) #linspace tworzy wektor z określoną liczbą równomiernie rozmieszczonych punktów pomiędzy wartością początkową a końcową
 
-    # granica efektywna
-    plt.plot(frontier_risks, frontier_returns, linestyle='-', marker='', label="Granica efektywna")
+        frontier_risks = []
+        frontier_returns = []
+        frontier_weights = []
 
-    # pojedyncze aktywa
-    asset_risks = np.sqrt(np.diag(Sigma))
-    asset_returns = mu
+        w = cp.Variable(self.numberOfAssets) # zmienna decyzyjna: wektory wag
+        
+        for target_return in target_returns:
+            constraints = [ #ograniczenia
+                cp.sum(w) == 1,
+                w @ self.expectedValueVector == target_return
+            ]
+            if not short_selling:
+                constraints.append(w >= 0)
 
-    if asset_labels is None:
-        asset_labels = [f"Asset {i}" for i in range(len(mu))]
+            portfolio_variance = cp.quad_form(w, self.covarianceMatrixValues)
+            problem = cp.Problem(cp.Minimize(portfolio_variance), constraints) #problem optymalizacyjny: minimalizacja wariancji portfela przy zadanych ograniczeniach
+            problem.solve()
 
-    plt.scatter(asset_risks, asset_returns, marker='o', label="Pojedyncze aktywa")
+            if w.value is None:
+                # problem mógł być niewykonalny dla danego target_return
+                continue
 
-    for i, label in enumerate(asset_labels):
-        plt.annotate(label, (asset_risks[i], asset_returns[i]),
-                     xytext=(5, 5), textcoords="offset points")
+            w_opt = w.value
+            mu_p = float(w_opt @ self.expectedValueVector)
+            sigma_p = float(np.sqrt(w_opt.T @ self.covarianceMatrixValues @ w_opt))
 
-    plt.xlabel("Ryzyko (odchylenie standardowe σ)")
-    plt.ylabel("Oczekiwana stopa zwrotu μ")
-    plt.title("Granica efektywna portfela Markowitza")
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+            frontier_risks.append(sigma_p)
+            frontier_returns.append(mu_p)
+            frontier_weights.append(w_opt)
+
+        return frontier_risks, frontier_returns, frontier_weights
+    
+    def generate_random_portfolios(self, n_portfolios=10000, seed=42):
+        """
+        Generuje losowe portfele dopuszczalne (wagi >=0, suma wag = 1)
+        i zwraca ich ryzyko i oczekiwaną stopę zwrotu.
+
+        Parametry
+        ---------
+        n_portfolios : int
+            Liczba losowych portfeli do wygenerowania.
+        seed : int
+            Ziarno generatora losowego dla powtarzalności wyników.
+
+        Zwraca
+        ------
+        risks : np.ndarray (n_portfolios,)
+            Odchylenia standardowe portfeli.
+        returns : np.ndarray (n_portfolios,)
+            Oczekiwane stopy zwrotu portfeli.
+        weights : np.ndarray (n_portfolios, n)
+            Macierz wag portfeli.
+        """
+
+        np.random.seed(seed)
+        
+
+        # Losowanie wag z rozkładu Dirichleta: w_i >= 0, sum(w)=1
+        W = np.random.dirichlet(alpha=np.ones(self.numberOfAssets), size=n_portfolios)
+
+        # Stopy zwrotu portfela: mu_p = w^T mu
+        port_returns = W @ self.expectedValueVector
+
+        # Wariancje portfela: sigma^2 = w^T Sigma w
+        port_variances = np.einsum('ij,jk,ik->i', W, self.covarianceMatrixValues, W)
+        port_risks = np.sqrt(port_variances)
+
+        return port_risks, port_returns, W
+    
+    def plot_feasible_set_and_efficient_frontier(self,n_portfolios=10000,num_points_frontier=50):
+    
+        """
+        Rysuje:
+        - "chmurę" punktów reprezentującą cały zbiór portfeli dopuszczalnych,
+        - granicę efektywną jako górną obwiednię,
+        - punkty pojedynczych aktywów.
+
+        Parametry
+        ----------
+        n_portfolios : int
+            Liczba losowych portfeli do wygenerowania (Monte Carlo).
+        num_points_frontier : int
+            Liczba punktów na granicy efektywnej.
+        """
+
+        print(n_portfolios)
+        asset_labels = self.asset_labels 
+        if asset_labels is None:
+            asset_labels = [f"Asset {i}" for i in range(self.numberOfAssets)]
+
+        # Zbiór portfeli dopuszczalnych (Monte Carlo)
+        feasible_risks, feasible_returns, _ = self.generate_random_portfolios(n_portfolios=n_portfolios)
+
+        # Granica efektywna
+        frontier_risks, frontier_returns, _ = self.compute_efficient_frontier(num_points=num_points_frontier, short_selling=False)
+
+        # Pojedyncze aktywa
+        asset_risks = np.sqrt(np.diag(self.covarianceMatrixValues))
+        asset_returns = self.expectedValueVector
+
+        # Wykres
+        plt.figure(figsize=(10, 6))
+
+        # cała chmura portfeli dopuszczalnych
+        plt.scatter(feasible_risks, feasible_returns,
+                    s=5, alpha=0.3, label="Portfele dopuszczalne (Monte Carlo)")
+
+        # granica efektywna
+        plt.plot(frontier_risks, frontier_returns,
+                linewidth=2.0, label="Granica efektywna")
+
+        # pojedyncze aktywa
+        plt.scatter(asset_risks, asset_returns,
+                    marker='o', s=40, label="Pojedyncze aktywa")
+
+        for i, label in enumerate(asset_labels):
+            plt.annotate(label,
+                        (asset_risks[i], asset_returns[i]),
+                        xytext=(5, 5),
+                        textcoords="offset points")
+
+        plt.xlabel("Ryzyko (odchylenie standardowe σ)")
+        plt.ylabel("Oczekiwana stopa zwrotu μ")
+        plt.title("Zbiór portfeli dopuszczalnych i granica efektywna (Markowitz)")
+        plt.grid(True)
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
 
 
-if __name__ == "__main__":
-    # 1. Obliczenie średnich i macierzy kowariancji
-    processor = indicators()
-    log_returns = processor.compute_log_returns()
 
-    mu_hat = processor.compute_mu_vector(use_log_returns=True)  # pandas.Series
-    Sigma_hat = log_returns.cov()    
 
-    mu = mu_hat.values          # wektor średnich (n,)
-    Sigma = Sigma_hat.values    # macierz kowariancji (n, n)
-    n = len(mu)
-    asset_labels = list(mu_hat.index)
-    # 2. Obliczenie punktów granicy efektywnej
-    frontier_risks, frontier_returns, frontier_weights = compute_efficient_frontier(mu, Sigma, num_points=50, short_selling=False)
 
-    # 3. Wizualizacja
-    plot_efficient_frontier(frontier_risks, frontier_returns, mu, Sigma, asset_labels=asset_labels)
+
