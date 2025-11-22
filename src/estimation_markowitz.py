@@ -2,7 +2,7 @@ from data_fetcher import *
 from scipy.optimize import minimize
 class indicators:
 
-    def __init__(self,end_date="2024-12-30", window_mean=60, window_sigma=252):
+    def __init__(self,end_date="2024-12-30", window_mean=252, window_sigma=252):
       
         self.adj_close_path = "adj_close.csv"
         self.adj_close = self._load_adj_close()
@@ -24,6 +24,28 @@ class indicators:
             raise FileNotFoundError(f"Nie znaleziono pliku {self.adj_close_path}.")
         
         return df
+    
+    def _handle_missing_data(self):
+        """
+        Zwraca indeks (pozycję) ostatniego dostępnego dnia sesyjnego
+        <= self.end_date. - jeśli self.end_date nie jest dniem sesyjnym 
+        bo np. weekend lub święto.
+        """
+        if self.log_returns is None:
+            self.compute_log_returns()
+
+        idx = self.log_returns.index
+
+        if self.end_date in idx:
+            effective_date = self.end_date
+        else:
+            mask = idx <= self.end_date
+            if not mask.any():
+                raise ValueError(f"Brak danych przed {self.end_date}.")
+            effective_date = idx[mask][-1]
+
+        return idx.get_loc(effective_date)
+
 
     def compute_log_returns(self, save_csv=True, csv_path="log_returns.csv"):
 
@@ -57,19 +79,17 @@ class indicators:
         end_date = pd.to_datetime(self.end_date)
 
         try:
-            end_loc = self.log_returns.index.get_loc(end_date)
+            end_loc = self._handle_missing_data()
         except KeyError:
-            raise ValueError(f"Data {end_date} nie występuje w danych.")
+            raise ValueError(f"błąd z datą: {end_date}.")
         
         # sprawdzamy czy mamy wystarczająco dużo danych wstecz
-        if end_loc < max(self.window_mean, self.window_sigma):
+        if end_loc < self.window_mean:
             raise ValueError(f"Za mało danych przed {end_date} aby użyć okna.")
         
         mean_window_vector = self.log_returns.iloc[end_loc - self.window_mean + 1 : end_loc + 1]
         mean_window_vector_values = mean_window_vector.mean().values  # numpy vector shape (N,)
         return mean_window_vector_values
-
-
     
     def estimate_cov_vector(self):
         """
@@ -88,27 +108,75 @@ class indicators:
         end_date = pd.to_datetime(self.end_date)
 
         try:
-            end_loc = self.log_returns.index.get_loc(end_date)
+            end_loc = self._handle_missing_data()
         except KeyError:
-            raise ValueError(f"Data {end_date} nie występuje w danych.")
+            raise ValueError(f"błąd z datą: {end_date}.")
         
         # sprawdzamy czy mamy wystarczająco dużo danych wstecz
-        if end_loc < max(self.window_mean, self.window_sigma):
+        if end_loc < self.window_sigma:
             raise ValueError(f"Za mało danych przed {end_date} aby użyć okna.")
         
         sigma_window_vector = self.log_returns.iloc[end_loc - self.window_sigma + 1 : end_loc + 1]
         sigma_window_vector_values = sigma_window_vector.cov().values  # pandas.DataFrame
         return sigma_window_vector_values
     
+    def compute_expected_return(self, weights):
+        """
+        Oblicza oczekiwaną stopę zwrotu portfela na podstawie wag i wektora średnich stóp zwrotu.
+        Zgodnie ze wzorem: E[R_p] = w^T * μ
+        """
+        return weights.T @ self.estimate_mean_vector()
+    
+    def compute_portfolio_variance(self, weights):
+        """
+        Oblicza wariancję portfela na podstawie wag i macierzy kowariancji stóp zwrotu.
+        Zgodnie ze wzorem: σ_p^2 = w^T * Σ * w
+        """
+        cov_matrix = self.estimate_cov_vector()
+        return weights.T @ cov_matrix @ weights
+    
 
-if __name__ == "__main__":
+indicator_calculator = indicators()
+weights = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1,0.1, 0.1, 0.1,0.1])
+
+    
+def sharpe_ratio(weights, risk_free_rate=0.01):
+    exp_ret = indicator_calculator.compute_expected_return(weights)
+    var = indicator_calculator.compute_portfolio_variance(weights)
+    return (exp_ret - risk_free_rate) / np.sqrt(var)
+
+def neg_sharpe_ratio():
+    return -sharpe_ratio()
+
+def neg_sharpe_ratio(weights, indicator_calculator, risk_free_rate=0.01):
+    expected_return = indicator_calculator.compute_expected_return(weights)
+    variance = indicator_calculator.compute_portfolio_variance(weights)
+    sharpe = (expected_return - risk_free_rate) / np.sqrt(variance)
+    return -sharpe
+
+constraints = {'type': 'eq', 'fun': lambda weights: np.sum(weights) - 1}
+bounds = [(0, 0.4) for _ in range(len(weights))]
+initial_weights = np.array([1/len(weights)]*len(weights))
+
+result = minimize(
+    neg_sharpe_ratio,
+    initial_weights,
+    args=(indicator_calculator, 0.01),
+    method='SLSQP',
+    bounds=bounds,
+    constraints=constraints
+)
+
+optimal_weights = result.x
+print("Optymalne wagi maksymalizujące Sharpe'a:", optimal_weights)
+expected_returnn = indicator_calculator.compute_expected_return(optimal_weights)
+variancen = indicator_calculator.compute_portfolio_variance(optimal_weights)
 
 
-    indicator_calculator = indicators()
-    mean_vector = indicator_calculator.estimate_mean_vector()
-    print("Mean Vector:")   
-    print(mean_vector)
-    cov_matrix = indicator_calculator.compute_cov_vector()
-    print("Covariance Matrix:") 
-    print(cov_matrix)
+
+        
+    
+
+
+
 

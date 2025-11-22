@@ -26,11 +26,10 @@ class MarkowitzPortfolioOptimizer:
         self.log_returns = processor.compute_log_returns()
 
         #Wektor oczekiwanych stóp zwrotu.
-        self.expectedValueVector = processor.compute_mean_vector(use_log_returns=True)
-        self.expectedValueVectorValues = self.expectedValueVector.values
-
+    
+        self.expectedValueVectorValues = indicator_calculator.estimate_mean_vector()
         #Macierz kowariancji stóp zwrotu.
-        self.covarianceMatrix = processor.compute_cov_vector()
+        self.covarianceMatrixValues = processor.compute_cov_vector()
         self.covarianceMatrixValues = processor.compute_cov_vector().values
 
         self.numberOfAssets = len(self.expectedValueVector)
@@ -192,3 +191,7 @@ class MarkowitzPortfolioOptimizer:
         plt.legend()
         plt.tight_layout()
         plt.show()
+
+if __name__ == "__main__":
+    optimizer = MarkowitzPortfolioOptimizer()
+    optimizer.plot_feasible_set_and_efficient_frontier(n_portfolios=5000, num_points_frontier=100)
