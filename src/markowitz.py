@@ -1,4 +1,5 @@
 from data_fetcher import *
+from estimation_markowitz import *
 import cvxpy as cp
 
 class MarkowitzPortfolioOptimizer:
@@ -191,9 +192,3 @@ class MarkowitzPortfolioOptimizer:
         plt.legend()
         plt.tight_layout()
         plt.show()
-
-
-
-
-
-
