@@ -136,6 +136,49 @@ class indicators:
         return weights.T @ cov_matrix @ weights
     
 
+class markowitz_optimizer:
+
+    def __init__(self, portfolio_returns, portfolio_risk, portfolio_covariance, lstm = False, risk_free_rate=0.01):
+
+
+        if lstm == False:
+
+            self.indicator_calculator = indicators()
+            self.portfolio_returns = portfolio_returns
+            self.portfolio_risk = portfolio_risk
+            self.portfolio_covariance = portfolio_covariance #estimate_cov_vector()
+            self.risk_free_rate = risk_free_rate
+
+        else:
+            pass #to be implemented for LSTM-based indicators
+
+
+
+    def compute_portfolio_sharpe(self, weights):
+        """
+        Oblicza Sharpe Ratio portfela na podstawie wag, oczekiwanej stopy zwrotu i wariancji.
+        Zgodnie ze wzorem: Sharpe = (E[R_p] - R_f) / σ_p
+        """
+        expected_return = self.portfolio_returns
+        variance = self.portfolio_risk
+        sharpe_ratio = (expected_return - self.risk_free_rate) / np.sqrt(variance)
+        return sharpe_ratio
+    
+    def compute_negative_sharpe(self, weights):
+        """
+        Oblicza negatywne Sharpe Ratio portfela (do minimalizacji).
+        """
+        return -self.compute_portfolio_sharpe(weights)
+
+
+
+    
+
+
+
+
+
+
 indicator_calculator = indicators()
 weights = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1,0.1, 0.1, 0.1,0.1])
 
