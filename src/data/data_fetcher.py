@@ -26,26 +26,22 @@ class StockDataFetcher:
 
         if data is None or data.empty:
             raise ValueError("nie udało się pobrać danych za pomocą yfinance.")
+        
+        data = data.reset_index()
+        data.rename(columns={"Date": "Date"}, inplace=True)
 
         self.data = data
-        data.to_csv("stocks_data.csv")  
+        data.to_csv(f"stocks_data_{self.tickers}.csv")  
         return data
-
-
-    def get_adj_close(self, data):
-
-        adj_close = data["Adj Close"].dropna(how="any") #usuwnaie NaN
-        self.adj_close = adj_close
-        adj_close.to_csv("adj_close.csv")
-        return adj_close
 
 
 if __name__ == "__main__":
 
-    tickers = ["NVDA", "AAPL", "GOOG", "MSFT", "AMZN", "AVGO", "META", "TSLA", "PLTR", "ORCL"]
+    tickers = ["NVDA", "AAPL", "GOOG", "MSFT", "AMZN", "META", "TSLA"]
     start_date = "2020-01-01"
-    end_date = "2024-12-31"
+    end_date = "2025-12-31"
 
-    fetcher = StockDataFetcher(tickers, start_date, end_date)
-    data = fetcher.get_stock_data_yfinance()
-    adj_close = fetcher.get_adj_close(data)
+    for ticker in tickers:
+
+        fetcher = StockDataFetcher(ticker, start_date, end_date)
+        data = fetcher.get_stock_data_yfinance()
