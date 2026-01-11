@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-
+from config.project_variables import WINDOW, FEATURES_SAVE_DIR
 
 
 def sma(series, window):
@@ -57,7 +57,7 @@ def atr(high, low, close, window=14):
 
     return atr
 
-def build_features(df, windows=[5, 10, 20]):
+def build_features(df, windows=WINDOW):
     """
     df: DataFrame OHLCV + Adj_Close
     windows: list okien czasowych (np. [5, 10, 20])
@@ -95,7 +95,7 @@ def build_features(df, windows=[5, 10, 20]):
     return features
 
 
-def save_features(features, ticker, save_dir="Deep-Learning-Portfolio-Optimization-and-building/data/features"):
+def save_features(features, ticker, save_dir=FEATURES_SAVE_DIR):
     os.makedirs(save_dir, exist_ok=True)
     features.to_csv(f"{save_dir}/features_{ticker}.csv")
 

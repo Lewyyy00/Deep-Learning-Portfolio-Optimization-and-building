@@ -1,13 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
-
-from data_fetcher import StockDataFetcher
-
-
-
-REQUIRED_COLS = ["Open", "High", "Low", "Close", "Adj_Close", "Volume"]
-
+from config.project_variables import REQUIRED_COLS, PROCESSED_SAVE_DIR
 
 def check_required_columns(df, ticker):
     """
@@ -85,7 +79,7 @@ def save_processed_data(prices, log_returns, save_dir):
     print(f"Zapisano: {save_dir}/log_returns.csv")
 
 
-def preprocess_pipeline(data_dict, save_dir="Deep-Learning-Portfolio-Optimization-and-building/data/processed"):
+def preprocess_pipeline(data_dict, save_dir=PROCESSED_SAVE_DIR):
     """
     Główna funkcja: bierze surowe dane {ticker: df} i robi cały preprocess.
     Zwraca: aligned_dict, prices, log_returns
@@ -106,12 +100,4 @@ def preprocess_pipeline(data_dict, save_dir="Deep-Learning-Portfolio-Optimizatio
 
     return aligned, prices, log_returns
 
-
-
-tickers = ["NVDA", "AAPL", "GOOG", "MSFT", "AMZN", "META", "TSLA"]
-save_dir="Deep-Learning-Portfolio-Optimization-and-building/data/processed"
-
-fetcher = StockDataFetcher(tickers, "2020-01-01", "2025-12-31")
-raw_data = fetcher.get_stock_data_yfinance()   # dict: {ticker: df}
-aligned, prices, log_returns = preprocess_pipeline(raw_data, save_dir)
 

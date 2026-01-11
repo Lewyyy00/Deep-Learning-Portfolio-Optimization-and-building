@@ -2,6 +2,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import os
+from config.project_variables import RAW_SAVE_DIR
 
 class StockDataFetcher:
 
@@ -10,7 +11,7 @@ class StockDataFetcher:
         self.start_date = start_date
         self.end_date = end_date
         self.data = {}   # dane OHLCV per ticker
-        self.save_dir = "Deep-Learning-Portfolio-Optimization-and-building/data/raw"
+        self.save_dir = RAW_SAVE_DIR
 
     def get_stock_data_yfinance(self):
 
@@ -43,15 +44,3 @@ class StockDataFetcher:
 
         return self.data
 
-if __name__ == "__main__":
-    
-    tickers = ["NVDA", "AAPL", "GOOG", "MSFT", "AMZN", "META", "TSLA"]
-
-    fetcher = StockDataFetcher(tickers, "2020-01-01", "2025-12-31")
-    data = fetcher.get_stock_data_yfinance()  
-
-    prices = pd.DataFrame({
-        t: df["Adj_Close"] for t, df in data.items()
-    })
-
-    log_returns = np.log(prices / prices.shift(1)).dropna()
