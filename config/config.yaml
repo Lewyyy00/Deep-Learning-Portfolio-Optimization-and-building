@@ -1,0 +1,15 @@
+experiment:
+  tickers: ["AAPL","MSFT","AMZN","NVDA","GOOGL","META","TSLA"]
+  train_start: "2020-01-01"
+  train_end: "2024-12-31"
+  test_start: "2025-01-01"
+  test_end: "2025-12-31"
+  initial_capital: 100000.0
+  rf_annual: 0.043
+
+portfolio:
+  estimation_windows: [21, 63, 252]
+  rebalance_steps: [1, 5, 20]
+  allow_fractional: true
+  long_only: true
+  fully_invested: true
