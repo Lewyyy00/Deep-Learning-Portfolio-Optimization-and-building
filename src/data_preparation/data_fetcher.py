@@ -1,7 +1,5 @@
 import yfinance as yf
 import pandas as pd
-import talib as ta
-import matplotlib.pyplot as plt
 import numpy as np
 import os
 
