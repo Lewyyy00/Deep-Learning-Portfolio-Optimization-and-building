@@ -7,19 +7,19 @@ def check_required_columns(df, ticker):
     """
     Sprawdza, czy dataframe ma wymagane kolumny OHLCV + Adj_Close.
     """
-    missing = [c for c in REQUIRED_COLS if c not in df.columns]
+    missing = [column for column in REQUIRED_COLS if column not in df.columns]
     if missing:
         raise ValueError(f"{ticker}: brakuje kolumn: {missing}. Dostępne: {list(df.columns)}")
 
 
 def check_missing_values(df, ticker):
     """
-    Sprawdza, czy są braki danych. Jeśli są, zwraca podsumowanie.
+    Sprawdza, czy są braki danych. Jeśli są, zwraca ile dokładnie brakuje.
     """
     na_counts = df.isna().sum()
     total_na = int(na_counts.sum())
     if total_na > 0:
-        print(f"[UWAGA] {ticker}: znaleziono braki danych (NaN).")
+        print(f"w {ticker}: znaleziono braki danych (NaN).")
         print(na_counts[na_counts > 0])
     return total_na
 
@@ -84,18 +84,18 @@ def preprocess_pipeline(data_dict, save_dir=PROCESSED_SAVE_DIR):
     Główna funkcja: bierze surowe dane {ticker: df} i robi cały preprocess.
     Zwraca: aligned_dict, prices, log_returns
     """
-    # 1) walidacja kolumn + braki
+    # walidacja kolumn + braki
     for ticker, df in data_dict.items():
         check_required_columns(df, ticker)
         check_missing_values(df, ticker)
 
-    # 2) ujednolicenie dat
+    # ujednolicenie dat
     aligned = align_common_dates(data_dict)
 
-    # 3) budowa cen i log-zwrotów
+    # budowa cen i log-zwrotów
     prices, log_returns = build_prices_and_log_returns(aligned)
 
-    # 4) zapis
+    # zapis
     save_processed_data(prices, log_returns, save_dir=save_dir)
 
     return aligned, prices, log_returns

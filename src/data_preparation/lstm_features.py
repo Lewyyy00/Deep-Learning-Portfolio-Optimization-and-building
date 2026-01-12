@@ -98,4 +98,5 @@ def build_features(df, windows=WINDOW):
 def save_features(features, ticker, save_dir=FEATURES_SAVE_DIR):
     os.makedirs(save_dir, exist_ok=True)
     features.to_csv(f"{save_dir}/features_{ticker}.csv")
+    print(f"Zapisano: {save_dir}/features_{ticker}.csv")
 

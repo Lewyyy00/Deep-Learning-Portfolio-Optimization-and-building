@@ -41,6 +41,7 @@ class StockDataFetcher:
 
             df.to_csv(f"{self.save_dir}/{ticker}.csv")
             self.data[ticker] = df
+            print(f"{self.save_dir}/Zapisano: {ticker}.csv")
 
         return self.data
 
