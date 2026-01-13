@@ -34,3 +34,21 @@ plt.grid(True, linestyle='--', alpha=0.7)
 
 plt.tight_layout()
 plt.show()
+
+df = pd.read_csv("data/features/features_AAPL.csv")
+df['Date'] = pd.to_datetime(df['Date'])
+df.set_index('Date', inplace=True)
+
+plt.figure(figsize=(12, 6))
+for column in df.columns[:-1]:
+    plt.plot(df.index, df[column], label=column)
+
+
+plt.title(f'Cechy wejściowe', fontsize=14)
+plt.xlabel('Data')
+plt.ylabel('Wartość cechy')
+plt.legend(title='Cechy wejściowe')
+plt.grid(True, linestyle='--', alpha=0.7)
+
+plt.tight_layout()
+plt.show()
