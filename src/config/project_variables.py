@@ -14,6 +14,9 @@ PROCESSED_SAVE_DIR="data/processed"
 FEATURES_SAVE_DIR="data/features"
 LSTM_PREDICTION_SAVE_DIR = PROJECT_ROOT / "data" / "predictions"
 LSTM_FEATURES_SAVE_DIR = PROJECT_ROOT / "data" / "features"
+MARKOWITZ_SAVE_DIR = PROJECT_ROOT / "data" / "markowitz"
+
+RETURNS_PATH = PROJECT_ROOT / "data" / "processed" / "log_returns.csv"
 
 FEATURE_COLS = ["close", "log_return", "dir", "mom_5", "vol_5", "rsi_14", "atr_14"]
 TARGET_COL = "target"
@@ -21,3 +24,6 @@ SEQ_LEN = 20 #długość sekwencji wejściowej dla LSTM
 BATCH_SIZE = 32 #rozmiar batcha podczas trenowania LSTM, im większy tym szybciej, ale wymaga więcej pamięci
 TICKER = "AAPL"
 EPOCHS = 10 #liczba epok trenowania LSTM
+
+ESTIMATION_WINDOW = 252
+REBALANCE_STEP = 20

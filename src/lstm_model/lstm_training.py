@@ -97,7 +97,7 @@ def train_for_ticker(ticker):
     model.fit(train_ds, epochs=EPOCHS, validation_data=test_ds, verbose=1)
 
     preds = model.predict(test_ds, verbose=0).flatten() # spłaszczanie do 1D (liczba_sekwencji, 1) --> (liczba_sekwencji,)
-    dates = test_df["Date"].iloc[SEQ_LEN - 1:].reset_index(drop=True) # dopasowanie dat do przewidywań, pomijając pierwsze SEQ_LEN-1 wierszy, w przypadku SEQ_LEN = 20 pomijamy pierwsze 19 wierszy, reset_index aby indeksy pasowały do preds:dates[i] odpowiada preds[i]
+    dates = test_df["Date"].iloc[SEQ_LEN - 1:].reset_index(drop=True) # dopasowanie dat do przewidywań, pomijając pierwsze SEQ_LEN-1 wierszy, w przypadku SEQ_LEN = 20 pomijamy pierwsze 19 wierszy, reset_index aby indeksy pasowały do preds:dates[i] = preds[i]
 
     pred_df = pd.DataFrame({"Date": dates, "pred_return": preds})
     save_predictions(pred_df, ticker)

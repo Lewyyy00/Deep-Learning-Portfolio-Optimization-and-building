@@ -1,197 +1,86 @@
-from data_fetcher import *
-from estimation_markowitz import *
-import cvxpy as cp
+import pandas as pd
 
-class MarkowitzPortfolioOptimizer:
+from src.config.project_variables import (
+    TICKERS,
+    TRAINING_END_DATE,
+    TEST_START_DATE,
+    ESTIMATION_WINDOW,
+    REBALANCE_STEP,
+    ESTIMATION_WINDOW,
+    REBALANCE_STEP,
+    MARKOWITZ_SAVE_DIR,
+    RETURNS_PATH,
+)
+
+MARKOWITZ_SAVE_DIR.mkdir(parents=True, exist_ok=True) 
+
+
+def load_log_returns():
+    if not RETURNS_PATH.exists():
+        raise FileNotFoundError(f"Brak pliku: {RETURNS_PATH}")
+
+    df = pd.read_csv(RETURNS_PATH)
+    df["Date"] = pd.to_datetime(df["Date"])
+    df = df.sort_values("Date").reset_index(drop=True)
+
+    return df
+
+
+def get_rebalance_dates(df):
     """
-    Klasa do optymalizacji portfela metodą Markowitza.
+    Daty rebalansu bierzemy z okresu testowego (2025),
+    co REBALANCE_STEP sesji.
     """
+    test_df = df[df["Date"] >= pd.to_datetime(TEST_START_DATE)].copy()
+    dates = test_df["Date"].tolist()
 
-    def __init__(self):
-        """
-        Inicjalizuje obiekt optymalizatora Markowitza, pobierając dane 
-        stóp zwrotu, kowariacje i ich statystyki z klasy indicators.
+    # co k-ty dzień w sensie sesji giełdowej (indeksowej), nie kalendarzowo
+    rebalance_dates = dates[::REBALANCE_STEP]
+    return rebalance_dates
 
-        ----------
-        ExpectedValueVector : np.ndarray, shape (n,)
-            Wektor oczekiwanych stóp zwrotu.
-        covarianceMatrix : np.ndarray, shape (n, n)
-            Macierz kowariancji stóp zwrotu.
-        numberOfAssets : int
-            Liczba aktywów w portfelu.
-        asset_labels : list[str]
-            Nazwy aktywów (np. tickery).
-        """
-        processor = indicators()
-        self.log_returns = processor.compute_log_returns()
-
-        #Wektor oczekiwanych stóp zwrotu.
-    
-        self.expectedValueVectorValues = indicator_calculator.estimate_mean_vector()
-        #Macierz kowariancji stóp zwrotu.
-        self.covarianceMatrixValues = processor.compute_cov_vector()
-        self.covarianceMatrixValues = processor.compute_cov_vector().values
-
-        self.numberOfAssets = len(self.expectedValueVector)
-        self.asset_labels = list(self.expectedValueVector.index)
-
-    def compute_efficient_frontier(self,num_points=50, short_selling=False):
-
-        """
-        Oblicza punkty granicy efektywnej dla zadanego wektora średnich stóp zwrotu
-        i macierzy kowariancji.
-
-        Parametry:
-        ----------
-        num_points : int
-            Liczba punktów na granicy efektywnej.
-        short_selling : bool
-            Czy dopuszczać krótką sprzedaż (wagi ujemne).
-
-        Zwraca:
-        -------
-        frontier_risks : list[float]
-            Lista odchyleń standardowych portfeli (σ_p).
-        frontier_returns : list[float]
-            Lista oczekiwanych stóp zwrotu portfeli (μ_p).
-        frontier_weights : list[np.ndarray]
-            Lista wektorów wag dla kolejnych portfeli na granicy.
+def get_history_window(df, rebalance_date, window):
     """
+    Zwraca ostatnie 'window' sesji PRZED datą rebalansu (bez look-ahead).
+    """
+    hist = df[df["Date"] < rebalance_date].tail(window)
 
-        mu_min = self.expectedValueVector.min()
-        mu_max = self.expectedValueVector.max()
+    if len(hist) < window:
+        raise ValueError(
+            f"Za mało danych historycznych przed {rebalance_date.date()}: "
+            f"jest {len(hist)}, potrzeba {window}."
+        )
+    return hist
 
-        target_returns = np.linspace(mu_min, mu_max, num_points) #linspace tworzy wektor z określoną liczbą równomiernie rozmieszczonych punktów pomiędzy wartością początkową a końcową
 
-        frontier_risks = []
-        frontier_returns = []
-        frontier_weights = []
+def estimate_mu(df, rebalance_date, window):
+    """
+    Klasyczna estymacja Markowitza:
+    mu_hat = średnia historycznych log-zwrotów z ostatnich 'window' sesji
+    dostępnych PRZED datą rebalansu (bez look-ahead).
+    """
+    hist = get_history_window(df, rebalance_date, window)
+    mu_hat = hist[TICKERS].mean(axis=0)
+    return mu_hat
 
-        w = cp.Variable(self.numberOfAssets) # zmienna decyzyjna: wektory wag
-        
-        for target_return in target_returns:
-            constraints = [ #ograniczenia
-                cp.sum(w) == 1,
-                w @ self.expectedValueVector == target_return
-            ]
-            if not short_selling:
-                constraints.append(w >= 0)
 
-            portfolio_variance = cp.quad_form(w, self.covarianceMatrixValues)
-            problem = cp.Problem(cp.Minimize(portfolio_variance), constraints) #problem optymalizacyjny: minimalizacja wariancji portfela przy zadanych ograniczeniach
-            problem.solve()
+def main():
+    df = load_log_returns()
 
-            if w.value is None:
-                # problem mógł być niewykonalny dla danego target_return
-                continue
+    # daty rebalansu w 2025
+    reb_dates = get_rebalance_dates(df)
 
-            w_opt = w.value
-            mu_p = float(w_opt @ self.expectedValueVector)
-            sigma_p = float(np.sqrt(w_opt.T @ self.covarianceMatrixValues @ w_opt))
+    rows = []
+    for date in reb_dates:
+        mu_hat = estimate_mu(df, date, ESTIMATION_WINDOW)
+        row = {"Date": date}
+        for t in TICKERS:
+            row[t] = mu_hat[t]
+        rows.append(row)
 
-            frontier_risks.append(sigma_p)
-            frontier_returns.append(mu_p)
-            frontier_weights.append(w_opt)
+    mu_df = pd.DataFrame(rows).sort_values("Date").reset_index(drop=True)
 
-        return frontier_risks, frontier_returns, frontier_weights
-    
-    def generate_random_portfolios(self, n_portfolios=10000, seed=42):
-        """
-        Generuje losowe portfele dopuszczalne (wagi >=0, suma wag = 1)
-        i zwraca ich ryzyko i oczekiwaną stopę zwrotu.
+    save_dir = MARKOWITZ_SAVE_DIR / f"mu_markowitz_W{ESTIMATION_WINDOW}_step{REBALANCE_STEP}.csv"
+    mu_df.to_csv(save_dir, index=False)
 
-        Parametry
-        ---------
-        n_portfolios : int
-            Liczba losowych portfeli do wygenerowania.
-        seed : int
-            Ziarno generatora losowego dla powtarzalności wyników.
-
-        Zwraca
-        ------
-        risks : np.ndarray (n_portfolios,)
-            Odchylenia standardowe portfeli.
-        returns : np.ndarray (n_portfolios,)
-            Oczekiwane stopy zwrotu portfeli.
-        weights : np.ndarray (n_portfolios, n)
-            Macierz wag portfeli.
-        """
-
-        np.random.seed(seed)
-        
-
-        # Losowanie wag z rozkładu Dirichleta: w_i >= 0, sum(w)=1
-        W = np.random.dirichlet(alpha=np.ones(self.numberOfAssets), size=n_portfolios)
-
-        # Stopy zwrotu portfela: mu_p = w^T mu
-        port_returns = W @ self.expectedValueVector
-
-        # Wariancje portfela: sigma^2 = w^T Sigma w
-        port_variances = np.einsum('ij,jk,ik->i', W, self.covarianceMatrixValues, W)
-        port_risks = np.sqrt(port_variances)
-
-        return port_risks, port_returns, W
-    
-    def plot_feasible_set_and_efficient_frontier(self,n_portfolios=10000,num_points_frontier=50):
-    
-        """
-        Rysuje:
-        - "chmurę" punktów reprezentującą cały zbiór portfeli dopuszczalnych,
-        - granicę efektywną jako górną obwiednię,
-        - punkty pojedynczych aktywów.
-
-        Parametry
-        ----------
-        n_portfolios : int
-            Liczba losowych portfeli do wygenerowania (Monte Carlo).
-        num_points_frontier : int
-            Liczba punktów na granicy efektywnej.
-        """
-
-        print(n_portfolios)
-        asset_labels = self.asset_labels 
-        if asset_labels is None:
-            asset_labels = [f"Asset {i}" for i in range(self.numberOfAssets)]
-
-        # Zbiór portfeli dopuszczalnych (Monte Carlo)
-        feasible_risks, feasible_returns, _ = self.generate_random_portfolios(n_portfolios=n_portfolios)
-
-        # Granica efektywna
-        frontier_risks, frontier_returns, _ = self.compute_efficient_frontier(num_points=num_points_frontier, short_selling=False)
-
-        # Pojedyncze aktywa
-        asset_risks = np.sqrt(np.diag(self.covarianceMatrixValues))
-        asset_returns = self.expectedValueVector
-
-        # Wykres
-        plt.figure(figsize=(10, 6))
-
-        # cała chmura portfeli dopuszczalnych
-        plt.scatter(feasible_risks, feasible_returns,
-                    s=5, alpha=0.3, label="Portfele dopuszczalne (Monte Carlo)")
-
-        # granica efektywna
-        plt.plot(frontier_risks, frontier_returns,
-                linewidth=2.0, label="Granica efektywna")
-
-        # pojedyncze aktywa
-        plt.scatter(asset_risks, asset_returns,
-                    marker='o', s=40, label="Pojedyncze aktywa")
-
-        for i, label in enumerate(asset_labels):
-            plt.annotate(label,
-                        (asset_risks[i], asset_returns[i]),
-                        xytext=(5, 5),
-                        textcoords="offset points")
-
-        plt.xlabel("Ryzyko (odchylenie standardowe σ)")
-        plt.ylabel("Oczekiwana stopa zwrotu μ")
-        plt.title("Zbiór portfeli dopuszczalnych i granica efektywna (Markowitz)")
-        plt.grid(True)
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-
-if __name__ == "__main__":
-    optimizer = MarkowitzPortfolioOptimizer()
-    optimizer.plot_feasible_set_and_efficient_frontier(n_portfolios=5000, num_points_frontier=100)
+    print(f"Zapisano: {save_dir}")
+   
