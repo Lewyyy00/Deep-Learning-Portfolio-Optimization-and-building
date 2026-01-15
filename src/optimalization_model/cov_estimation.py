@@ -3,12 +3,14 @@ from pathlib import Path
 
 from src.markowitz_model.markowitz import get_rebalance_dates, load_log_returns, get_history_window
 from src.config.project_variables import (
+    SEQ_LEN,
     TICKERS,  
     ESTIMATION_WINDOW,   
     REBALANCE_STEP,
-    MARKOWITZ_SAVE_DIR    
+    MARKOWITZ_SAVE_DIR,
+    TEST_START_DATE,
+        
 )
-
 
 def estimate_sigma(hist):
     """
@@ -18,14 +20,17 @@ def estimate_sigma(hist):
     sigma_hat = hist[TICKERS].cov()
     return sigma_hat
 
-
 def main():
     
     df = load_log_returns()
-    rebalance_dates = get_rebalance_dates(df)
+    rebalance_dates = get_rebalance_dates(
+    df=df,
+    test_start_date=TEST_START_DATE,
+    rebalance_step=REBALANCE_STEP,
+    seq_len=SEQ_LEN
+)
 
-    # lista wyników w formacie long: Date, asset_i, asset_j, cov
-    sigma_rows = []
+    sigma_rows = [] # lista wyników w formacie long: Date, asset_i, asset_j, cov, później przekształcimy na pivot
     for date in rebalance_dates:
         hist = get_history_window(df, date, ESTIMATION_WINDOW)
         sigma_hat = estimate_sigma(hist)
@@ -50,3 +55,6 @@ def main():
     sigma_df.to_csv(sigma_path, index=False)
 
     print(f"Zapisano: {sigma_path}")
+
+if __name__ == "__main__":
+    main()  

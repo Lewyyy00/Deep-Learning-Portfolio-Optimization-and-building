@@ -10,6 +10,7 @@ from src.config.project_variables import (
     REBALANCE_STEP,
     MARKOWITZ_SAVE_DIR,
     RETURNS_PATH,
+    SEQ_LEN
 )
 
 MARKOWITZ_SAVE_DIR.mkdir(parents=True, exist_ok=True) 
@@ -25,17 +26,23 @@ def load_log_returns():
 
     return df
 
-
-def get_rebalance_dates(df):
+def get_rebalance_dates(df,
+                        test_start_date,
+                        rebalance_step,
+                        seq_len):
     """
-    Daty rebalansu bierzemy z okresu testowego (2025),
-    co REBALANCE_STEP sesji.
-    """
-    test_df = df[df["Date"] >= pd.to_datetime(TEST_START_DATE)].copy()
-    dates = test_df["Date"].tolist()
+    Rebalans co 'rebalance_step' sesji, ale pierwszy rebalans dopiero wtedy,
+    gdy LSTM może wygenerować pierwszą prognozę (seq_len - 1 sesji po starcie testu).
 
-    # co k-ty dzień w sensie sesji giełdowej (indeksowej), nie kalendarzowo
-    rebalance_dates = dates[::REBALANCE_STEP]
+    df: DataFrame z kolumną Date (posortowany)
+    """
+    df = df.sort_values("Date").reset_index(drop=True)
+    test_start = pd.to_datetime(test_start_date)
+
+    test_dates = df[df["Date"] >= test_start]["Date"].tolist() # wszystkie sesje testowe od startu testu
+    start_idx = seq_len - 1 # przesunięcie startu: musimy mieć seq_len obserwacji, więc start = seq_len-1
+    rebalance_dates = test_dates[start_idx::rebalance_step] # daty rebalansu: startując od start_idx, co rebalance_step
+    
     return rebalance_dates
 
 def get_history_window(df, rebalance_date, window):
@@ -67,10 +74,16 @@ def main():
     df = load_log_returns()
 
     # daty rebalansu w 2025
-    reb_dates = get_rebalance_dates(df)
+    rebalance_dates = get_rebalance_dates(
+        df=df,
+        test_start_date=TEST_START_DATE,
+        rebalance_step=REBALANCE_STEP,
+        seq_len=SEQ_LEN
+)
+
 
     rows = []
-    for date in reb_dates:
+    for date in rebalance_dates:
         mu_hat = estimate_mu(df, date, ESTIMATION_WINDOW)
         row = {"Date": date}
         for t in TICKERS:
@@ -84,3 +97,5 @@ def main():
 
     print(f"Zapisano: {save_dir}")
    
+if __name__ == "__main__":
+    main()

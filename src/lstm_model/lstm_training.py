@@ -6,7 +6,7 @@ from src.config.project_variables import (
     FEATURE_COLS, TARGET_COL, SEQ_LEN, BATCH_SIZE,
     TRAINING_END_DATE, TEST_START_DATE,
     EPOCHS, LSTM_PREDICTION_SAVE_DIR, LSTM_FEATURES_SAVE_DIR,
-    TICKERS
+    TICKERS, MARKOWITZ_SAVE_DIR
 )
 
 def load_data(ticker):
@@ -109,5 +109,31 @@ def main():
         train_for_ticker(ticker)
 
 
+def load_mu_lstm():
+    """
+    Buduje tabelę: Date + kolumny tickery, gdzie wartości to prognozy LSTM.
+    """
+    dfs = []
+    for t in TICKERS:
+        path = LSTM_PREDICTION_SAVE_DIR / f"lstm_pred_{t}.csv"
+        df = pd.read_csv(path)
+        df["Date"] = pd.to_datetime(df["Date"])
+        df = df.rename(columns={"pred_return": t})
+        dfs.append(df[["Date", t]])
+
+    # scalanie po dacie (inner => zostają tylko wspólne daty)
+    mu_df = dfs[0]
+    for df in dfs[1:]:
+        mu_df = mu_df.merge(df, on="Date", how="inner")
+
+    mu_df = mu_df.sort_values("Date").reset_index(drop=True)
+
+    path = MARKOWITZ_SAVE_DIR /  f"mu_lstm_seq{SEQ_LEN}_e{EPOCHS}_b{BATCH_SIZE}.csv"
+    mu_df.to_csv(path, index=False)
+
+    return mu_df
+
+
 if __name__ == "__main__":
     main()
+    load_mu_lstm()

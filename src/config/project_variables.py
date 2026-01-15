@@ -6,7 +6,7 @@ START_DATE = "2020-01-01"
 TRAINING_END_DATE = "2024-12-31"
 TEST_START_DATE = "2025-01-01"
 END_DATE = "2025-12-31"
-WINDOW = [5]
+WINDOW = [5] #okresy do obliczania cech technicznych
 REQUIRED_COLS = ["Open", "High", "Low", "Close", "Adj_Close", "Volume"]
 
 RAW_SAVE_DIR="data/raw"
@@ -27,3 +27,5 @@ EPOCHS = 10 #liczba epok trenowania LSTM
 
 ESTIMATION_WINDOW = 252
 REBALANCE_STEP = 20
+RISK_FREE_RATE_ANNUAL = 0.043  
+TRADING_DAYS = 252
