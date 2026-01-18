@@ -1,3 +1,4 @@
+from pathlib import Path
 import pandas as pd
 import tensorflow as tf
 from sklearn.preprocessing import StandardScaler
@@ -6,7 +7,7 @@ from src.config.project_variables import (
     FEATURE_COLS, TARGET_COL, SEQ_LEN, BATCH_SIZE,
     TRAINING_END_DATE, TEST_START_DATE,
     EPOCHS, LSTM_PREDICTION_SAVE_DIR, LSTM_FEATURES_SAVE_DIR,
-    TICKERS, MARKOWITZ_SAVE_DIR
+    TICKERS, MARKOWITZ_SAVE_DIR, VALIDATION_START_DATE, VALIDATION_END_DATE, LSTM_UNITS, DROPOUT, TUNING_SAVE_DIR
 )
 
 def load_data(ticker):
@@ -27,46 +28,57 @@ def load_data(ticker):
     return df
 
 
-def split_train_test(df,
-                     train_end=TRAINING_END_DATE,
+def split_train_test(df, 
+                     train_end=TRAINING_END_DATE, 
                      test_start=TEST_START_DATE):
     """
-    Podział czasowy (walidacja out-of-sample): train=2020–2024, test=2025.
-    Usuwa wiersze z brakami w cechach i w zmiennej objaśnianej.
+    Dzieli dane na zbiory treningowy i testowy według dat.
+    Usuwa wiersze z brakującymi wartościami w FEATURE_COLS i TARGET_COL
     """
     train_df = df[df["Date"] <= train_end].dropna(subset=FEATURE_COLS + [TARGET_COL]).copy()
-    test_df = df[df["Date"] >= test_start].dropna(subset=FEATURE_COLS + [TARGET_COL]).copy()
+    test_df  = df[df["Date"] >= test_start].dropna(subset=FEATURE_COLS + [TARGET_COL]).copy()
     return train_df, test_df
+    
 
-
-def make_dataset(X, y, shuffle):
-    """
-    Buduje dataset sekwencyjny dla LSTM.
-    Każda próbka to okno długości SEQ_LEN; target odpowiada końcowi okna.
-    """
+def make_dataset(X, y, seq_len, shuffle):
     return tf.keras.utils.timeseries_dataset_from_array(
         data=X,
         targets=y,
-        sequence_length=SEQ_LEN,
-        sequence_stride=1, # stride = 1, czyli przesuwamy się o 1 krok po każdej sekwencji
-        shuffle=shuffle, # czy mieszać próbki
+        sequence_length=seq_len,
+        sequence_stride=1,
+        shuffle=shuffle,
         batch_size=BATCH_SIZE,
     )
 
 
-def build_model(n_features):
-    """
-    Buduje model LSTM do regresji zwrotów.
-    32 jednostki LSTM, 1 neuron wyjściowy.
-    Wykorzystuje optymalizator Adam i funkcje straty MSE.
-    """
+def build_model(seq_len, n_features, lstm_units=32, dropout=0.2):
     model = tf.keras.Sequential([
-        tf.keras.layers.Input(shape=(SEQ_LEN, n_features)),
-        tf.keras.layers.LSTM(32),
+        tf.keras.layers.Input(shape=(seq_len, n_features)),
+        tf.keras.layers.LSTM(lstm_units),
+        tf.keras.layers.Dropout(dropout),
         tf.keras.layers.Dense(1)
     ])
     model.compile(optimizer="adam", loss="mse")
     return model
+
+def load_best_params():
+    """
+    Oczekiwany plik: data/markowitz/lstm_tuning_best_per_ticker.csv
+    Kolumny: ticker, seq_len, dropout, lstm_units
+    """
+    path = f"{TUNING_SAVE_DIR}/lstm_tuning_best_per_ticker.csv"
+    df = pd.read_csv(path)
+
+    # zamiana na słownik: params[ticker] = {...}
+    params = {}
+    for _, r in df.iterrows():
+        params[str(r["ticker"])] = {
+            "seq_len": int(r["seq_len"]),
+            "dropout": float(r["dropout"]),
+            "lstm_units": int(r["lstm_units"]),
+        }
+    return params
+
 
 def save_predictions(pred_df: pd.DataFrame, ticker: str):
     """
@@ -77,9 +89,14 @@ def save_predictions(pred_df: pd.DataFrame, ticker: str):
     pred_df.to_csv(path, index=False)
     print(f"[{ticker}] Zapisano: {path}")
 
-def train_for_ticker(ticker):
+def train_for_ticker(ticker, params):
     df = load_data(ticker)
     train_df, test_df = split_train_test(df)
+
+    #seq_len = params["seq_len"]
+    seq_len = SEQ_LEN # Używamy stałej SEQ_LEN zamiast parametru z tuningu, ponieważ w optymalizacji używamy tej samej długości sekwencji dla wszystkich tickerów
+    dropout = params["dropout"]
+    lstm_units = params["lstm_units"]
 
     X_train = train_df[FEATURE_COLS].values
     y_train = train_df[TARGET_COL].values
@@ -90,24 +107,17 @@ def train_for_ticker(ticker):
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
-    train_ds = make_dataset(X_train, y_train, shuffle=True)
-    test_ds = make_dataset(X_test, y_test, shuffle=False)
+    train_ds = make_dataset(X_train, y_train, seq_len=seq_len, shuffle=False)
+    test_ds = make_dataset(X_test, y_test, seq_len=seq_len, shuffle=False)
 
-    model = build_model(n_features=len(FEATURE_COLS))
-    model.fit(train_ds, epochs=EPOCHS, validation_data=test_ds, verbose=1)
+    model = build_model(seq_len=seq_len, n_features=len(FEATURE_COLS), lstm_units=lstm_units, dropout=dropout)
+    model.fit(train_ds, epochs=EPOCHS, verbose=1) #verbose=1 pokazuje postęp trenowania
 
     preds = model.predict(test_ds, verbose=0).flatten() # spłaszczanie do 1D (liczba_sekwencji, 1) --> (liczba_sekwencji,)
     dates = test_df["Date"].iloc[SEQ_LEN - 1:].reset_index(drop=True) # dopasowanie dat do przewidywań, pomijając pierwsze SEQ_LEN-1 wierszy, w przypadku SEQ_LEN = 20 pomijamy pierwsze 19 wierszy, reset_index aby indeksy pasowały do preds:dates[i] = preds[i]
 
     pred_df = pd.DataFrame({"Date": dates, "pred_return": preds})
     save_predictions(pred_df, ticker)
-
-
-def main():
-
-    for ticker in TICKERS:
-        train_for_ticker(ticker)
-
 
 def load_mu_lstm():
     """
@@ -134,12 +144,20 @@ def load_mu_lstm():
     return mu_df
 
 def lstm_pipeline():
-    """
-    Główna funkcja: trenuje modele LSTM dla wszystkich tickerów
-    i zapisuje prognozy mu_lstm.
-    """
-    main()
+    best_params = load_best_params()
+
+    for ticker in TICKERS:
+        if ticker not in best_params:
+            raise ValueError(f"Brak parametrów tuningu dla tickera: {ticker}")
+
+        print(f"\n[{ticker}] Parametry: {best_params[ticker]}")
+        train_for_ticker(ticker, best_params[ticker])
+
     load_mu_lstm()
     print(f"Zapisano mu_lstm do {MARKOWITZ_SAVE_DIR}")
+
+
+if __name__ == "__main__":
+    lstm_pipeline()
 
 

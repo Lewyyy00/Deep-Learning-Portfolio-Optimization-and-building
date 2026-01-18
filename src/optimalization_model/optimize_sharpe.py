@@ -119,7 +119,7 @@ def optimize_max_sharpe(mu, sigma, rf_daily):
     if not res.success:
         raise RuntimeError(f"Optymalizacja nieudana: {res.message}")
 
-    w_opt = np.clip(res.x, 0.0, 1.0) # mała korekta numeryczna (czasem suma wychodzi 0.9999999)
+    w_opt = np.clip(res.x, 0.0, 1.0) 
     w_opt = w_opt / w_opt.sum()
 
     return w_opt
@@ -154,7 +154,6 @@ def optimalization_main(lstm=False):
         for i, t in enumerate(TICKERS):
             out_row[t] = float(w[i])
 
-        # (opcjonalnie) diagnostyka Sharpe dla tej daty
         out_row["sharpe_daily"] = float(sharpe_ratio(w, mu, sigma, rf_daily))
 
         rows.append(out_row)
@@ -162,7 +161,7 @@ def optimalization_main(lstm=False):
     w_df = pd.DataFrame(rows).sort_values("Date").reset_index(drop=True)
 
     if lstm:
-        out_path = MARKOWITZ_SAVE_DIR / f"weights_sharpe_lstm_W{ESTIMATION_WINDOW}_step{REBALANCE_STEP}.csv"
+        out_path = MARKOWITZ_SAVE_DIR / f"weights_sharpe_lstm_seq{SEQ_LEN}_e{EPOCHS}_b{BATCH_SIZE}_step{REBALANCE_STEP}.csv"
     else:
         out_path = MARKOWITZ_SAVE_DIR / f"weights_sharpe_markowitz_W{ESTIMATION_WINDOW}_step{REBALANCE_STEP}.csv"
 
@@ -170,4 +169,9 @@ def optimalization_main(lstm=False):
 
     print(f"Zapisano: {out_path}")
     print("Liczba rebalansów:", len(w_df))
+
+if __name__ == "__main__":
+    optimalization_main(lstm=False)
+    optimalization_main(lstm=True)
+
 

@@ -70,7 +70,7 @@ def estimate_mu(df, rebalance_date, window):
     return mu_hat
 
 
-def main():
+def markowitz_main():
     df = load_log_returns()
 
     # daty rebalansu w 2025
@@ -98,4 +98,4 @@ def main():
     print(f"Zapisano: {save_dir}")
    
 if __name__ == "__main__":
-    main()
+    markowitz_main()

@@ -3,7 +3,10 @@ import pandas as pd
 from pathlib import Path
 
 from src.config.project_variables import (
+    ESTIMATION_WINDOW,
+    REBALANCE_STEP,
     RETURNS_PATH,
+    BACKTEST_SAVE_DIR,
     TICKERS,
     START_CAPITAL,             
     TEST_START_DATE,           
@@ -11,7 +14,10 @@ from src.config.project_variables import (
     TRADING_DAYS,              
     RISK_FREE_RATE_ANNUAL,     
     PRICES_PATH,       
-    MARKOWITZ_SAVE_DIR         
+    MARKOWITZ_SAVE_DIR,
+    SEQ_LEN,
+    BATCH_SIZE,
+    EPOCHS        
 )
 
 from src.optimalization_model.optimize_sharpe import annual_to_daily_rf
@@ -73,6 +79,8 @@ def performance_metrics(portfolio_value):
     dd = compute_drawdown(value)
     max_dd = dd.min()
 
+    sterling_ratio = (mean_daily * TRADING_DAYS) / (abs(max_dd) + 1e-12)
+
    #metryki efektywności portfela
     return {
         "start_balance": round(float(value.iloc[0]), 2),
@@ -82,7 +90,7 @@ def performance_metrics(portfolio_value):
         "sharpe_annual": round(float(sharpe_annual), 4),
         "sortino_annual": round(float(sortino_annual), 4),
         "max_drawdown": round(float(max_dd), 4),
-        "sterling_ratio": round(float((mean_daily * TRADING_DAYS) / (abs(max_dd) + 1e-12)), 6),
+        "sterling_ratio": round(float(sterling_ratio), 6),
     }
 
 
@@ -149,37 +157,41 @@ def run_backtest(prices, weights, initial_capital):
 
 
 def backtest_main():
+
+    # stworzenie katalogu na wyniki backtestu
+    BACKTEST_SAVE_DIR.mkdir(parents=True, exist_ok=True)
+
     prices = load_prices()
 
-    w_markowitz_path = MARKOWITZ_SAVE_DIR / "weights_sharpe_markowitz_W252_step20.csv"
-    w_lstm_path = MARKOWITZ_SAVE_DIR / "weights_sharpe_lstm_W252_step20.csv"
+    # scieżki do wag
+    weights_markowitz_path = MARKOWITZ_SAVE_DIR / f"weights_sharpe_markowitz_W{ESTIMATION_WINDOW}_step{REBALANCE_STEP}.csv"
+    weights_lstm_path = MARKOWITZ_SAVE_DIR / f"weights_sharpe_lstm_seq{SEQ_LEN}_e{EPOCHS}_b{BATCH_SIZE}_step{REBALANCE_STEP}.csv"
 
-    w_markowitz = load_weights(w_markowitz_path)
-    w_lstm = load_weights(w_lstm_path)
+    # wczytanie wag
+    weights_markowitz = load_weights(weights_markowitz_path)
+    weights_lstm = load_weights(weights_lstm_path)
 
-    bt_m = run_backtest(prices, w_markowitz, START_CAPITAL)
-    bt_l = run_backtest(prices, w_lstm, START_CAPITAL)
+    # backtesty
+    backtest_markowitz = run_backtest(prices, weights_markowitz, START_CAPITAL) 
+    backtest_lstm = run_backtest(prices, weights_lstm, START_CAPITAL)
 
     # metryki
-    m_metrics = performance_metrics(bt_m["PortfolioValue"])
-    l_metrics = performance_metrics(bt_l["PortfolioValue"])
+    markowitz_metrics = performance_metrics(backtest_markowitz["PortfolioValue"])
+    lstm_metrics = performance_metrics(backtest_lstm["PortfolioValue"])
 
     # zapis wyników
-    out_dir = MARKOWITZ_SAVE_DIR / "backtests"
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    bt_m.to_csv(out_dir / "equity_markowitz.csv", index=False)
-    bt_l.to_csv(out_dir / "equity_lstm.csv", index=False)
+    backtest_markowitz.to_csv(BACKTEST_SAVE_DIR / f"equity_markowitz_W{ESTIMATION_WINDOW}_step{REBALANCE_STEP}.csv", index=False) #index=False żeby nie zapisywało indeksu DataFrame jako kolumny
+    backtest_lstm.to_csv(BACKTEST_SAVE_DIR / f"equity_lstm_seq{SEQ_LEN}_e{EPOCHS}_b{BATCH_SIZE}_step{REBALANCE_STEP}.csv", index=False)
 
     print("=== Markowitz ===")
-    for k, v in m_metrics.items():
+    for k, v in markowitz_metrics.items():
         print(f"{k}: {v}")
 
     print("\n=== LSTM ===")
-    for k, v in l_metrics.items():
+    for k, v in lstm_metrics.items():
         print(f"{k}: {v}")
 
-    print("\nZapisano serie wartości portfeli do:", out_dir)
+    print("\nZapisano serie wartości portfeli do:", BACKTEST_SAVE_DIR)
 
 if __name__ == "__main__":
     backtest_main()    
