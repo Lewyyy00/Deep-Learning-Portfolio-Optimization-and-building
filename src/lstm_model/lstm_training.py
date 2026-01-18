@@ -48,8 +48,8 @@ def make_dataset(X, y, shuffle):
         data=X,
         targets=y,
         sequence_length=SEQ_LEN,
-        sequence_stride=1,
-        shuffle=shuffle,
+        sequence_stride=1, # stride = 1, czyli przesuwamy się o 1 krok po każdej sekwencji
+        shuffle=shuffle, # czy mieszać próbki
         batch_size=BATCH_SIZE,
     )
 
@@ -133,7 +133,13 @@ def load_mu_lstm():
 
     return mu_df
 
-
-if __name__ == "__main__":
+def lstm_pipeline():
+    """
+    Główna funkcja: trenuje modele LSTM dla wszystkich tickerów
+    i zapisuje prognozy mu_lstm.
+    """
     main()
     load_mu_lstm()
+    print(f"Zapisano mu_lstm do {MARKOWITZ_SAVE_DIR}")
+
+

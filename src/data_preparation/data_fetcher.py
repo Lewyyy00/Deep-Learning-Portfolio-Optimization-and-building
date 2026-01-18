@@ -2,7 +2,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import os
-from config.project_variables import RAW_SAVE_DIR
+from src.config.project_variables import RAW_SAVE_DIR
 
 class StockDataFetcher:
 

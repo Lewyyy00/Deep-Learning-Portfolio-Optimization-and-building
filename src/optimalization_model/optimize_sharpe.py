@@ -125,7 +125,7 @@ def optimize_max_sharpe(mu, sigma, rf_daily):
     return w_opt
 
 
-def main(lstm=False):
+def optimalization_main(lstm=False):
     rf_daily = annual_to_daily_rf(RISK_FREE_RATE_ANNUAL, TRADING_DAYS)
 
     dates = load_log_returns()
@@ -171,7 +171,3 @@ def main(lstm=False):
     print(f"Zapisano: {out_path}")
     print("Liczba rebalansów:", len(w_df))
 
-
-if __name__ == "__main__":
-    main()
-    main(True) #drugi raz dla LSTM

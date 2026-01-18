@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
-from config.project_variables import REQUIRED_COLS, PROCESSED_SAVE_DIR
+from src.config.project_variables import REQUIRED_COLS, PROCESSED_SAVE_DIR
 
 def check_required_columns(df, ticker):
     """

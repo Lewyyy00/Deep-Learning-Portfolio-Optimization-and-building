@@ -20,7 +20,7 @@ def estimate_sigma(hist):
     sigma_hat = hist[TICKERS].cov()
     return sigma_hat
 
-def main():
+def sigma_main():
     
     df = load_log_returns()
     rebalance_dates = get_rebalance_dates(
@@ -56,5 +56,3 @@ def main():
 
     print(f"Zapisano: {sigma_path}")
 
-if __name__ == "__main__":
-    main()  

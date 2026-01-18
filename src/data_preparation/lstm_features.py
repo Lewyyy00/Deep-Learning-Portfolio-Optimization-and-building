@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-from config.project_variables import WINDOW, FEATURES_SAVE_DIR
+from src.config.project_variables import WINDOW, FEATURES_SAVE_DIR
 
 
 def sma(series, window):

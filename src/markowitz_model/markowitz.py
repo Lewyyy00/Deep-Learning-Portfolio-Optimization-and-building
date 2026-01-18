@@ -49,7 +49,7 @@ def get_history_window(df, rebalance_date, window):
     """
     Zwraca ostatnie 'window' sesji PRZED datą rebalansu (bez look-ahead).
     """
-    hist = df[df["Date"] < rebalance_date].tail(window)
+    hist = df[df["Date"] < rebalance_date].tail(window) #tail zwraca ostatnie 'window' wierszy
 
     if len(hist) < window:
         raise ValueError(
