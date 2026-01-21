@@ -68,7 +68,7 @@ def performance_metrics(portfolio_value):
 
     rf_daily = annual_to_daily_rf(RISK_FREE_RATE_ANNUAL, TRADING_DAYS)
 
-    # Sharpe (roczny) – na log-zwrotach jako przybliżenie
+    # Sharpe (roczny) 
     sharpe_annual = np.sqrt(TRADING_DAYS) * ((mean_daily - rf_daily) / (vol_daily + 1e-12))
 
     # Sortino: odchylenie tylko dla ujemnych zwrotów
@@ -108,8 +108,6 @@ def run_backtest(prices, weights, initial_capital):
     end = pd.to_datetime(END_DATE)
 
     prices = prices[(prices["Date"] >= start) & (prices["Date"] <= end)].reset_index(drop=True)
-
-    # ustaw indeks na Date dla łatwych lookupów
     prices_idx = prices.set_index("Date")[TICKERS]
 
     rebalance_dates = weights["Date"].tolist()
@@ -118,9 +116,7 @@ def run_backtest(prices, weights, initial_capital):
     capital = initial_capital
     shares = pd.Series(0.0, index=TICKERS)
 
-    # wynik dzienny
     out_rows = []
-
     for date in prices_idx.index:
         px = prices_idx.loc[date]
 
@@ -192,6 +188,11 @@ def backtest_main():
         print(f"{k}: {v}")
 
     print("\nZapisano serie wartości portfeli do:", BACKTEST_SAVE_DIR)
+
+    return {
+        "markowitz": markowitz_metrics,
+        "lstm": lstm_metrics
+    }
 
 if __name__ == "__main__":
     backtest_main()    

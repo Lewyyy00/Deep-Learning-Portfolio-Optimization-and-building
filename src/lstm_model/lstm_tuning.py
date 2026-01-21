@@ -26,10 +26,10 @@ def split_train_test(df,
     return train_df, val_df, test_df
 
 
-def directional_accuracy(y_true, y_pred):
+"""def directional_accuracy(y_true, y_pred):
     # trafność znaku (czy zwrot dodatni/ujemny)
     return float(np.mean(np.sign(y_true) == np.sign(y_pred)))
-
+"""
 
 def evaluate_on_val(model, val_df, scaler, seq_len):
     X_val = scaler.transform(val_df[FEATURE_COLS].values)
@@ -40,14 +40,14 @@ def evaluate_on_val(model, val_df, scaler, seq_len):
     preds = model.predict(val_ds, verbose=0).flatten()
     y_true = y_val[seq_len - 1:]  # dopasowanie do końców sekwencji
 
-    mse = float(np.mean((y_true - preds) ** 2))
+    mse = float(np.mean((y_true - preds) ** 2)) 
     mae = float(np.mean(np.abs(y_true - preds)))
-    da = directional_accuracy(y_true, preds)
+    #da = directional_accuracy(y_true, preds)
 
-    return mse, mae, da
+    return mse, mae#, da
 
 
-def tune_for_ticker(ticker: str) -> pd.DataFrame:
+def tune_for_ticker(ticker):
     df = load_data(ticker)
     train_df, val_df, _ = split_train_test(df)
 
@@ -56,11 +56,15 @@ def tune_for_ticker(ticker: str) -> pd.DataFrame:
     X_train = scaler.fit_transform(train_df[FEATURE_COLS].values)
     y_train = train_df[TARGET_COL].values
 
+    X_val = scaler.transform(val_df[FEATURE_COLS].values)
+    y_val = val_df[TARGET_COL].values
+
     results = []
 
     for lstm_units in LSTM_UNITS_GRID:
         for seq_len in SEQ_GRID:
             train_ds = make_dataset(X_train, y_train, seq_len=seq_len, shuffle=True)
+            val_ds = make_dataset(X_val, y_val, seq_len=seq_len, shuffle=False)
 
             for dropout in DROPOUT_GRID:
                 model = build_model(
@@ -70,29 +74,23 @@ def tune_for_ticker(ticker: str) -> pd.DataFrame:
                     dropout=dropout
                 )
 
-                callbacks = [
-                    tf.keras.callbacks.EarlyStopping(
-                        monitor="loss", patience=2, restore_best_weights=True
-                    )
-                ]
-
-                model.fit(train_ds, epochs=EPOCHS, verbose=0, callbacks=callbacks)
-
-                mse, mae, da = evaluate_on_val(model, val_df, scaler, seq_len)
+                callbacks = [tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=2, restore_best_weights=True)]
+                model.fit(train_ds, epochs=EPOCHS, validation_data=val_ds, verbose=0, callbacks=callbacks)
+                mse, mae = evaluate_on_val(model, val_df, scaler, seq_len)
 
                 results.append({
                     "ticker": ticker,
                     "seq_len": seq_len,
                     "dropout": dropout,
                     "lstm_units": lstm_units,
-                    "val_mse": mse,
-                    "val_mae": mae,
-                    "val_dir_acc": da
+                    "val_mse": mse, #validation mean squared error
+                    "val_mae": mae, #validation mean absolute error
+                    #"val_dir_acc": da #validation directional accuracy
                 })
 
                 print(
                     f"[{ticker}] units={lstm_units}, seq={seq_len}, dropout={dropout} "
-                    f"-> MSE={mse:.6f}, DA={da:.3f}"
+                    f"-> MSE={mse:.6f}, MAE={mae:.6f}"
                 )
 
     return pd.DataFrame(results).sort_values(["val_mse", "val_mae"], ascending=True).reset_index(drop=True)

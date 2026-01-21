@@ -1,11 +1,11 @@
 from pathlib import Path
 
 TICKERS = ["AAPL","MSFT","AMZN","NVDA","GOOGL","META","TSLA"] #lista tickerów z MAG7 do analizy
-START_DATE = "2020-01-01" #data rozpoczęcia analizy
-TRAINING_END_DATE = "2024-12-31" #data zakończenia treningu LSTM
-TEST_START_DATE = "2025-01-01" #data rozpoczęcia testu LSTM
-VALIDATION_START_DATE = "2024-01-01" #data rozpoczęcia walidacji LSTM
-VALIDATION_END_DATE = "2024-12-31" #data zakończenia walidacji LSTM
+START_DATE = "2012-07-01" #data rozpoczęcia analizy
+TRAINING_END_DATE = "2023-12-31" #data zakończenia treningu LSTM
+TEST_START_DATE = "2024-01-01" #data rozpoczęcia testu LSTM
+VALIDATION_START_DATE = "2021-01-01" #data rozpoczęcia walidacji LSTM
+VALIDATION_END_DATE = "2023-12-31" #data zakończenia walidacji LSTM
 END_DATE = "2025-12-31" #data zakończenia analizy
 WINDOW = [5] #okresy do obliczania cech technicznych
 REQUIRED_COLS = ["Open", "High", "Low", "Close", "Adj_Close", "Volume"] #wymagane kolumny w danych surowych
@@ -33,11 +33,11 @@ LSTM_UNITS = 64 #liczba jednostek LSTM w warstwie LSTM
 DROPOUT = 0.2 #współczynnik dropout w warstie Dropout LSTM
 
 # siatka hiperparametrów
-SEQ_GRID = [10, 20, 30]
-DROPOUT_GRID = [0.0, 0.2]
-LSTM_UNITS_GRID = [32, 64]
+SEQ_GRID = [30] # Używamy stałej SEQ_LEN zamiast parametru z tuningu, ponieważ w optymalizacji używamy tej samej długości sekwencji dla wszystkich tickerów, inaczej problemy z rebalansowaniem portfela
+DROPOUT_GRID = [0.0, 0.2, 0.4]
+LSTM_UNITS_GRID = [32, 64] #s
 
-ESTIMATION_WINDOW = 252 #okres estymacji kowariancji (dni handlowe w roku)
+ESTIMATION_WINDOW = 21 #okres estymacji kowariancji (dni handlowe w roku)
 REBALANCE_STEP = 5 #co ile dni rebalans portfela
 RISK_FREE_RATE_ANNUAL = 0.043 #roczna stopa wolna od ryzyka 
 TRADING_DAYS = 252 #liczba dni handlowych w roku

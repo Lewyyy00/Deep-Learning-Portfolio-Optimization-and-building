@@ -7,7 +7,7 @@ from src.config.project_variables import (
     FEATURE_COLS, TARGET_COL, SEQ_LEN, BATCH_SIZE,
     TRAINING_END_DATE, TEST_START_DATE,
     EPOCHS, LSTM_PREDICTION_SAVE_DIR, LSTM_FEATURES_SAVE_DIR,
-    TICKERS, MARKOWITZ_SAVE_DIR, VALIDATION_START_DATE, VALIDATION_END_DATE, LSTM_UNITS, DROPOUT, TUNING_SAVE_DIR
+    TICKERS, MARKOWITZ_SAVE_DIR, TUNING_SAVE_DIR
 )
 
 def load_data(ticker):
@@ -45,7 +45,7 @@ def make_dataset(X, y, seq_len, shuffle):
         data=X,
         targets=y,
         sequence_length=seq_len,
-        sequence_stride=1,
+        sequence_stride=1, # stride = 1, czyli każdy kolejny element sekwencji jest przesunięty o 1
         shuffle=shuffle,
         batch_size=BATCH_SIZE,
     )
@@ -107,7 +107,7 @@ def train_for_ticker(ticker, params):
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
-    train_ds = make_dataset(X_train, y_train, seq_len=seq_len, shuffle=False)
+    train_ds = make_dataset(X_train, y_train, seq_len=seq_len, shuffle=True)
     test_ds = make_dataset(X_test, y_test, seq_len=seq_len, shuffle=False)
 
     model = build_model(seq_len=seq_len, n_features=len(FEATURE_COLS), lstm_units=lstm_units, dropout=dropout)
